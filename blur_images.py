@@ -57,3 +57,53 @@ try:
                         f.write(data_string+"\n")
 except:
     print(f'{os.path.basename(file)} has no detected objects.')
+
+
+def blur_regions(image, regions):
+    """
+    Blurs the image, given the x1,y1,x2,y2 cordinates using Gaussian Blur.
+    """
+    for region in regions:
+        x1,y1,x2,y2 = region
+        x1, y1, x2, y2 = round(x1), round(y1), round(x2), round(y2)
+        roi = image[y1:y2, x1:x2]
+        blurred_roi = cv2.GaussianBlur(roi, (config['blur_radius'], config['blur_radius']), 0)
+        image[y1:y2, x1:x2] = blurred_roi
+    return image
+
+txt_folder = 'annot_txt/'
+image_folder = config['images_path']
+output_folder = config['output_folder']
+
+# Create the output folder if it doesn't exist
+if not os.path.exists(output_folder):
+    os.makedirs(output_folder)
+
+# List all text files in the 'dir' folder
+txt_files = [f for f in os.listdir(txt_folder) if f.endswith('.txt')]
+
+for txt_file in txt_files:
+    # Read the text file containing bounding box information
+    with open(os.path.join(txt_folder, txt_file), 'r') as f:
+        lines = f.readlines()
+
+    # Extract bounding box coordinates from the txt file
+    bboxes = []
+    for line in lines:
+        values = line.strip().split()
+        x_min, y_min, x_max, y_max = map(int, values)  # Assuming VOC format with x_min, y_min, x_max, y_max
+        bboxes.append([x_min, y_min, x_max, y_max])
+
+    # Read the corresponding image
+    image_file = txt_file.replace('.txt', config["img_format"])  # Assuming image files have .jpg extension
+    image_path = os.path.join(image_folder, image_file)
+    image = cv2.imread(image_path)
+
+    # Apply Gaussian blur to each bounding box region
+    for bbox in bboxes:
+        image = blur_regions(image, bboxes)
+
+    # Save the blurred image to the output folder
+    output_file = txt_file.replace('.txt', '_blurred.jpg')
+    output_path = os.path.join(output_folder, output_file)
+    cv2.imwrite(output_path, image)
