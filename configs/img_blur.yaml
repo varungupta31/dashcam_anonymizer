@@ -1,9 +1,9 @@
 model_path: 'model/best.pt'
 images_path: 'images/'
 detection_conf_thresh: 0.1
-gpu_avail: False
-img_format: .png
+gpu_avail: False #True
+img_format: .png #or any other format supported by YOLO
 img_width: 960
 img_height: 540
-blur_radius: 31
+blur_radius: 31 #increase to increase blur intensity (odd values)
 output_folder: blurred_images
