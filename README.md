@@ -17,6 +17,8 @@ conda env create -f environment.yaml
 
 To blur all images in a directory,
 
+Download the model from [here](https://iiitaphyd-my.sharepoint.com/:u:/g/personal/gupta_varun_research_iiit_ac_in/ESmbAC2vtABIvbg-524i-0gBJfARU0IuIFpwktIsXlBbtA?e=fUCBzY) and move it to  `model` dir.
+
 Update the `configs/img_blur.yaml` as required, and run the following command
 
 ```
