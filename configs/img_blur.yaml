@@ -1,5 +1,9 @@
-model_path: 'model/fake_best.pt'
+model_path: 'model/best.pt'
 images_path: 'images/'
 detection_conf_thresh: 0.1
-gpu_avail: True
+gpu_avail: False
 img_format: .png
+img_width: 960
+img_height: 540
+blur_radius: 31
+output_folder: blurred_images
