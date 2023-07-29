@@ -1,0 +1,4 @@
+model_path: 'model/fake_best.pt'
+images_path: 'images/'
+detection_conf_thresh: 0.1
+gpu_avail: True
