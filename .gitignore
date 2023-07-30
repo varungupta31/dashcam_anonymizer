@@ -5,3 +5,4 @@ model/best.pt
 runs/detect/yolo_videos_pred/labels/*.txt
 .vscode
 annot_jsons/*.json
+blurred_videos/*.mp4

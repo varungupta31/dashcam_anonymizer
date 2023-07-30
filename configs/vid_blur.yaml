@@ -5,7 +5,8 @@ gpu_avail: False #True
 vid_format: .png #or any other format supported by YOLO
 vid_width: 1920
 vid_height: 1080
-generate_detections: False #False if the YOLO annotations already present (saves compute!)
+generate_detections: True #False if the YOLO annotations already present (saves compute!)
+generate_jsons: True
 vid_fps: 25
 blur_radius: 31 #increase to increase blur intensity (odd values)
-output_folder: blurred_videos
+output_folder: blurred_videos/
