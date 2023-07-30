@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["--config", "configs/img_blur.yaml"]
+            "args": ["--config", "configs/vid_blur.yaml"]
         }
     ]
 }

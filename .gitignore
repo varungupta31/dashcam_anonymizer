@@ -1,0 +1,7 @@
+**/*.mp4
+images/*.png
+model/best.pt
+**/*.json
+runs/detect/yolo_videos_pred/labels/*.txt
+.vscode
+annot_jsons/*.json
