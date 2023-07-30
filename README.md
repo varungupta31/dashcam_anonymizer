@@ -1,5 +1,13 @@
 <h1> Dashcam Anonymizer </h1>
 
+<p align="center">
+<img src="media/demo.gif" />
+<img src="media/sample_image_3.png" width="500"/>
+</p>
+<p float="left">
+<img src="media/sample_image_1.png" width="500"/>
+<img src="media/sample_image_2.png" width="500"/></p>
+
 This repository blurs human faces and license plates in images and videos, using a state-of-the-art object detection model, [YOLOv8 by Ultralytics](https://github.com/ultralytics/ultralytics) and is fine-tuned using images from the [OpenImagesDatasetV7](https://storage.googleapis.com/openimages/web/index.html).
 
 git clone this repo by
@@ -26,3 +34,16 @@ python blur_images.py --config configs/img_blur.yaml
 ```
 The resulting blur images will be stored in the directory specified in the YAML.
 Note: `annot_txt` folder will contain the YOLO detections in `.txt` format, converted to the `VOC` bounding-box format.
+
+
+<h3> Blurring Videos in a Directory </h3>
+
+Similar approach as above, now the command would be
+
+```
+python blur_videos.py --config configs/vid_blur.yaml
+```
+Note:
+1. Make sure the opencv is installed via Conda. PIP installation, leaves out some libgc libraries, which causes issues in the videowriter codecs.
+2. The configuration files are slightly different for videos and images. Make sure to choose and edit the correct ones depending upon the modality.
+
