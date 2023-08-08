@@ -27,7 +27,7 @@ if(config["generate_detections"]):
                 save_txt=True,
                 conf=config['detection_conf_thresh'],
                 device='cuda:0',
-                name="yolo_vidoes_pred")
+                name="yolo_videos_pred")
     else:
         _ = model(source=config['videos_path'],
                 save=False,
