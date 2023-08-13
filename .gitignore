@@ -3,6 +3,8 @@ images/*.png
 model/best.pt
 **/*.json
 runs/detect/yolo_videos_pred/labels/*.txt
-.vscode
+.vscode/
 annot_jsons/*.json
 blurred_videos/*.mp4
+.DS_Store/
+
