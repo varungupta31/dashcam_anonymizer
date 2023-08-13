@@ -51,3 +51,4 @@ Note:
 1. Make sure the opencv is installed via Conda. PIP installation, leaves out some libgc libraries, which causes issues in the videowriter codecs.
 2. The configuration files are slightly different for videos and images. Make sure to choose and edit the correct ones depending upon the modality.
 3. This is designed to process all the contents in a given directory at once. If the blurring is to be re-run, make sure to delete the `runs` directory, as it may lead to new file names within the runs, which will cause errors.
+4. The `blur_videos.py` script currently expects the videos to be named numerically [1.mp4, 111.mp4]

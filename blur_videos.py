@@ -27,6 +27,7 @@ if(config["generate_detections"]):
                 save_txt=True,
                 conf=config['detection_conf_thresh'],
                 device='cuda:0',
+                project='runs/detect/',
                 name="yolo_videos_pred")
     else:
         _ = model(source=config['videos_path'],
@@ -34,6 +35,7 @@ if(config["generate_detections"]):
                 save_txt=True,
                 conf=config['detection_conf_thresh'],
                 device='cpu',
+                project='runs/detect/',
                 name="yolo_videos_pred")
     
 
@@ -127,4 +129,5 @@ for video in videos:
         print(f"No objects in file {video}, copying file as is. PLEASE CHECK DETECTOR AGAIN.")
         shutil.copy(video, anonymized_videos_path)
         print(f"Processed Video {video_number}")
-        
+
+print(f"@@ The bluured videos are saved in Directory -------> {config['output_folder']}")
