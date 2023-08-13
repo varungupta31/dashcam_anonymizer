@@ -12,6 +12,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--config", help = "path of the training configuartion file", required = True)
 args = parser.parse_args()
 
+if (os.path.exists("annot_txt")):
+    os.rmdir("annot_txt")
+
 #Reading the configuration file
 with open(args.config, 'r') as f:
     try:
@@ -27,6 +30,7 @@ if(config["gpu_avail"]):
             save_txt=True,
             conf=config['detection_conf_thresh'],
             device='cuda:0',
+            project='runs/detect/',
             name="yolo_images_pred")
 else:
     _ = model(source=config['images_path'],
@@ -34,6 +38,7 @@ else:
             save_txt=True,
             conf=config['detection_conf_thresh'],
             device='cpu',
+            project="runs/detect/",
             name="yolo_images_pred")
 
 
@@ -107,3 +112,5 @@ for txt_file in txt_files:
     output_file = txt_file.replace('.txt', '_blurred.jpg')
     output_path = os.path.join(output_folder, output_file)
     cv2.imwrite(output_path, image)
+
+print(f"@@ The bluured images are saved in Directory -------> {config['output_folder']}")
