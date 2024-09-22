@@ -11,7 +11,7 @@
 # Setup 🔩
 Clone this repo by
 ```
-https://github.com/varungupta31/dashcam_anonymizer.git
+git clone https://github.com/varungupta31/dashcam_anonymizer.git
 ```
 
 ## A Convenient Script Has Been Provided To Setup the Repository 👨🏽‍💻
@@ -19,13 +19,13 @@ https://github.com/varungupta31/dashcam_anonymizer.git
 Activate any Python Environment of Your Preference (`conda` recommended)
 
 ```
-cd dashcam_anonymizer
-chmod +x setup.sh
+$ cd dashcam_anonymizer
+$ chmod +x setup.sh
 
 # Always be careful runnning .sh files, feel free to browse the contents of setup.sh before running
 # The setup.sh file downloads relevant libraries and download the custom YOLO model as well (an alternate link if provided below as well)
 
-./setup.sh
+$ ./setup.sh
 ```
 [2024 🗞️] The model is now also hosted on a Google Drive, enabling the convenient `gdown` downloads!
 
@@ -52,7 +52,7 @@ Similar approach as above, now the command would be
 python blur_videos.py --config configs/vid_blur.yaml
 ```
 Note:
-1. If you run into mysterious `libgc` errors, make sure the `opencv` is installed via `Conda`. PIP installation, leaves out some `libgc` libraries, which causes issues in the videowriter codecs.
+1. If you run into mysterious `libgc` errors, what worked for me was to also install the `opencv` via `Conda`. PIP installation, leaves out some `libgc` libraries, which causes issues in the videowriter codecs.
 2. The configuration files are slightly different for videos and images. Make sure to choose and edit the correct ones depending upon the modality.
 3. This is designed to process all the contents in a given directory at once. If the blurring is to be re-run, make sure to delete the `runs` directory, as it may lead to new file names within the runs, which will cause errors.
 4. <strike>The `blur_videos.py` script currently expects the videos to be named numerically [1.mp4, 111.mp4]</strike> [Updates 2024, not anymore - name file as you wish]
