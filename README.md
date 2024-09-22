@@ -1,12 +1,11 @@
 # Dashcam Anonymizer 🕵🏻‍♂️
 
-### This repository blurs human faces and license plates in images and videos, using a state-of-the-art object detection model, [YOLOv8 by Ultralytics](https://github.com/ultralytics/ultralytics) and is fine-tuned using images from the [OpenImagesDatasetV7](https://storage.googleapis.com/openimages/web/index.html).
+### This repository blurs human faces and license plates in images and videos using a state-of-the-art object detection model, [YOLOv8 by Ultralytics](https://github.com/ultralytics/ultralytics), and is fine-tuned using images from the [OpenImagesDatasetV7](https://storage.googleapis.com/openimages/web/index.html).
 
+<p align="center">
 <img src="media/demo.gif"/>
-<img src="media/sample_image_3.png" width="500"/>
-<img src="media/sample_image_1.png" width="500"/>
-<img src="media/sample_image_2.png" width="500"/>
-
+<img src="media/face_blur.jpg" width="800"/>
+</p>
 
 # Setup 🔩
 Clone this repo by
