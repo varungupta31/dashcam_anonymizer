@@ -17,6 +17,8 @@ git clone https://github.com/varungupta31/dashcam_anonymizer.git
 
 Activate any Python Environment of Your Preference (`conda` recommended)
 
+Preferably with `Python3.10+` 🐍
+
 ```
 $ cd dashcam_anonymizer
 $ chmod +x setup.sh
