@@ -34,7 +34,7 @@ $ ./setup.sh
 
 To blur all images in a directory,
 
-Download the model from [here](https://iiitaphyd-my.sharepoint.com/:u:/g/personal/gupta_varun_research_iiit_ac_in/ESmbAC2vtABIvbg-524i-0gBJfARU0IuIFpwktIsXlBbtA?e=fUCBzY) and move it to  `model` dir.
+Download the model from [here](https://iiithydresearch-my.sharepoint.com/:u:/g/personal/gupta_varun_research_iiit_ac_in/Ed4j0TaPWu5Os8zl4QDBlgMBF37-pApibw-2NsQu2Ee-sg?e=uYRibp) and move it to  `model` dir.
 
 Update the `configs/img_blur.yaml` as required, and run the following command
 
