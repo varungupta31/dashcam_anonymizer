@@ -9,3 +9,5 @@ blurred_videos/*.mp4
 .DS_Store/
 videos/.DS_Store/
 .DS_Store
+venv/
+__pycache__/

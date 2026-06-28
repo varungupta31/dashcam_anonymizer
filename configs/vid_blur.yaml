@@ -5,4 +5,6 @@ gpu_avail: True #True #False
 generate_detections: True #False if the YOLO annotations already present (saves compute!)
 generate_jsons: True
 blur_radius: 31 #increase to increase blur intensity (odd values)
+blur_passes: 3  #number of blur passes — more passes = stronger anonymization
+imgsz: 1280     #YOLO inference resolution — larger catches small/distant faces and plates
 output_folder: blurred_videos

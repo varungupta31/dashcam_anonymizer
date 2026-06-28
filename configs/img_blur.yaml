@@ -6,4 +6,6 @@ img_format: .png #or any other format supported by YOLO
 img_width: 960
 img_height: 540
 blur_radius: 31 #increase to increase blur intensity (odd values)
+blur_passes: 3  #number of blur passes — more passes = stronger anonymization
+imgsz: 1280     #YOLO inference resolution — larger catches small/distant faces and plates
 output_folder: blurred_images
