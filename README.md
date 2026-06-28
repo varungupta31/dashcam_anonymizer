@@ -17,7 +17,7 @@ git clone https://github.com/varungupta31/dashcam_anonymizer.git
 
 Activate any Python Environment of Your Preference (`conda` recommended)
 
-Preferably with `Python3.10+` 🐍
+Requires **Python 3.10 or 3.11** 🐍 (Python 3.12+ is not supported — some dependencies such as `ultralytics`, `torch`, and `pybboxes` have known compatibility issues on newer versions)
 
 ```
 $ cd dashcam_anonymizer

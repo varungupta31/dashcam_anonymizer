@@ -6,6 +6,8 @@ import pybboxes as pbx
 import yaml
 import argparse
 from ultralytics import YOLO
+import gc
+import torch
 
 
 parser = argparse.ArgumentParser()
@@ -29,17 +31,24 @@ if(config["gpu_avail"]):
             save=False,
             save_txt=True,
             conf=config['detection_conf_thresh'],
+            imgsz=config.get('imgsz', 1280),
             device='cuda:0',
             project='runs/detect/',
             name="yolo_images_pred")
+    torch.cuda.empty_cache()
 else:
     _ = model(source=config['images_path'],
             save=False,
             save_txt=True,
             conf=config['detection_conf_thresh'],
+            imgsz=config.get('imgsz', 1280),
             device='cpu',
             project="runs/detect/",
             name="yolo_images_pred")
+
+# Clear model from memory
+del _
+gc.collect()
 
 
 #images = [int(item.split("/")[1].replace(config['img_format'], "")) for item in images]
@@ -66,14 +75,17 @@ except:
 
 def blur_regions(image, regions):
     """
-    Blurs the image, given the x1,y1,x2,y2 cordinates using Gaussian Blur.
+    Blurs the image, given the x1,y1,x2,y2 cordinates using repeated Gaussian blur passes.
     """
+    blur_k = config['blur_radius']
+    passes = config.get('blur_passes', 1)
     for region in regions:
         x1,y1,x2,y2 = region
         x1, y1, x2, y2 = round(x1), round(y1), round(x2), round(y2)
         roi = image[y1:y2, x1:x2]
-        blurred_roi = cv2.GaussianBlur(roi, (config['blur_radius'], config['blur_radius']), 0)
-        image[y1:y2, x1:x2] = blurred_roi
+        for _ in range(passes):
+            roi = cv2.GaussianBlur(roi, (blur_k, blur_k), 0)
+        image[y1:y2, x1:x2] = roi
     return image
 
 txt_folder = 'annot_txt/'
@@ -112,5 +124,15 @@ for txt_file in txt_files:
     output_file = txt_file.replace('.txt', '_blurred.jpg')
     output_path = os.path.join(output_folder, output_file)
     cv2.imwrite(output_path, image)
+    
+    # Explicitly delete image to free memory
+    del image
+    del bboxes
+    gc.collect()
 
-print(f"@@ The bluured images are saved in Directory -------> {config['output_folder']}")
+# Final cleanup
+gc.collect()
+if config.get("gpu_avail"):
+    torch.cuda.empty_cache()
+
+print(f"@@ The blurred images are saved in Directory -------> {config['output_folder']}")

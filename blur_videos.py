@@ -8,9 +8,13 @@ import argparse
 from ultralytics import YOLO
 import shutil
 from rich.console import Console
-from rich.progress import track
+from rich.progress import Progress, BarColumn, TimeElapsedColumn, TimeRemainingColumn, TextColumn, MofNCompleteColumn
 from natsort import natsorted
 from os.path import join as osj
+import gc
+import torch
+import subprocess
+import tempfile
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", help = "path of the training configuartion file", required = True)
@@ -29,154 +33,210 @@ with open(args.config, 'r') as f:
 console.print("Loading YOLO Model...", style="bold green")
 model = YOLO(config["model_path"])
 
-if(config["generate_detections"]):
-    console.print("Generating YOLO Detections for the Videos", style="bold green")
-    # Note: The YOLO model() call is generally capable of finding all supported video formats in a directory.
-    # No changes are needed here.
-    if(config["gpu_avail"]):
-        console.print("GPU Available, Running on GPU", style="bold green")
-        _ = model(source=config['videos_path'],
-                save=False,
-                save_txt=True,
-                conf=config['detection_conf_thresh'],
-                device='cuda:0',
-                project='runs/detect/',
-                name="yolo_videos_pred")
-    else:
-        console.print("GPU Not Available, Running on CPU", style="bold orange")
-        _ = model(source=config['videos_path'],
-                save=False,
-                save_txt=True,
-                conf=config['detection_conf_thresh'],
-                device='cpu',
-                project='runs/detect/',
-                name="yolo_videos_pred")
-    
-# =========================================================================================
-# CHANGE 1: Search for multiple video file extensions, not just .mp4
-# =========================================================================================
-video_extensions = ['*.mp4', '*.avi', '*.mov', '*.mkv', '*.wmv', '*.flv'] # Add any other video formats you use
+# ── Discover videos ───────────────────────────────────────────────────────────
+video_extensions = ['*.mp4', '*.MP4', '*.avi', '*.AVI', '*.mov', '*.MOV',
+                    '*.mkv', '*.MKV', '*.wmv', '*.WMV', '*.flv', '*.FLV']
 videos = []
 for ext in video_extensions:
     videos.extend(glob.glob(os.path.join(config['videos_path'], ext)))
-
 videos = natsorted(videos)
-# =========================================================================================
 
-if(config["generate_jsons"]):
-    print(f"Generating JSONs for {len(videos)} videos")
-    for video in track(videos):
-        # =========================================================================================
-        # CHANGE 2: Use os.path.splitext to robustly get the video name without its extension
-        # =========================================================================================
-        vid_name, _ = os.path.splitext(os.path.basename(video))
-        # =========================================================================================
+# ── Create output folder ──────────────────────────────────────────────────────
+anonymized_videos_path = config["output_folder"]
+os.makedirs(anonymized_videos_path, exist_ok=True)
 
-        vid = cv2.VideoCapture(video)
-        height = vid.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        width = vid.get(cv2.CAP_PROP_FRAME_WIDTH)
-        vid.release() # Release the video capture object after getting dimensions
-        
-        data_dict = {}
-        # The yolo prediction folder name matches the video name without extension
-        annot_dir = natsorted(glob.glob(f'runs/detect/yolo_videos_pred/labels/{vid_name}_*.txt'))
-        
-        try:
-            for file in annot_dir:
-                if (os.path.basename(file).endswith('.txt')):
-                    frame_num = int(os.path.basename(file).replace(".txt","").split("_")[1])
-                    with open(file, 'r') as fin:
-                        for line in fin.readlines():
-                            line = [float(item) for item in line.split()[1:]]
-                            line = pbx.convert_bbox(line, from_type="yolo", to_type="voc", image_size=(width,height))
-                            if(frame_num not in data_dict.keys()):
-                                data_dict[frame_num] = [] # Initialize as empty list
-                            data_dict[frame_num].append(line)
-            if(not os.path.exists("annot_jsons/")):
-                os.mkdir("annot_jsons")
-            with open("annot_jsons/"+str(vid_name)+".json", 'w') as f:
-                json.dump(data_dict, f)
-        except Exception as e:
-            print(f'Could not process annotations for {video}. Error: {e}')
-
+# =============================================================================
+# Helper functions — all defined before any code calls them
+# =============================================================================
 
 def blur_regions(image, regions):
-    """
-    Blurs the image, given the x1,y1,x2,y2 cordinates using Gaussian Blur.
-    """
+    """Blur bounding-box regions in-place using repeated Gaussian blur passes."""
+    blur_k = config["blur_radius"] if config["blur_radius"] % 2 != 0 else config["blur_radius"] + 1
+    passes = config.get("blur_passes", 1)
     for region in regions:
-        x1,y1,x2,y2 = region
-        x1, y1, x2, y2 = round(x1), round(y1), round(x2), round(y2)
-        # Ensure coordinates are within image bounds
+        x1, y1, x2, y2 = (round(v) for v in region)
         y1, y2 = max(0, y1), min(image.shape[0], y2)
         x1, x2 = max(0, x1), min(image.shape[1], x2)
         if x1 < x2 and y1 < y2:
             roi = image[y1:y2, x1:x2]
-            # Kernel size must be odd
-            blur_k = config["blur_radius"] if config["blur_radius"] % 2 != 0 else config["blur_radius"] + 1
-            blurred_roi = cv2.GaussianBlur(roi, (blur_k, blur_k), 0)
-            image[y1:y2, x1:x2] = blurred_roi
+            for _ in range(passes):
+                roi = cv2.GaussianBlur(roi, (blur_k, blur_k), 0)
+            image[y1:y2, x1:x2] = roi
     return image
 
 
-if not(os.path.exists(config["output_folder"])):
-    console.print(f"Creating Directory {config['output_folder']} to store the anonymized videos", style="bold green")
-    os.mkdir(config["output_folder"])
+def load_frame_detections(frame_num, detections_dir, width, height):
+    """Load detections for a single frame on-demand from the YOLO label files."""
+    pattern = os.path.join(detections_dir, f"*_{frame_num}.txt")
+    files = glob.glob(pattern)
+    if not files:
+        return []
+    detections = []
+    with open(files[0], 'r') as fin:
+        for line in fin:
+            coords = [float(v) for v in line.split()[1:]]
+            coords = pbx.convert_bbox(coords, from_type="yolo", to_type="voc",
+                                      image_size=(int(width), int(height)))
+            detections.append(coords)
+    return detections
 
-anonymized_videos_path = config["output_folder"]
 
-for video in track(videos):
-    # =========================================================================================
-    # CHANGE 3: Use os.path.splitext again for consistency
-    # =========================================================================================
-    vid_name, _ = os.path.splitext(os.path.basename(video))
-    # =========================================================================================
-    
-    json_path = f'annot_jsons/{vid_name}.json'
-    if(os.path.exists(json_path)):
-        with open(json_path) as F:
-            data = json.load(F)
+def stream_to_ffmpeg(input_path, output_path, fps, frame_width, frame_height, detections_dir, total_frames):
+    """
+    Read frames from input_path, optionally blur detected regions, and stream
+    raw bytes to an ffmpeg subprocess for H.264 encoding.
+    Detections are loaded one frame at a time (on-demand) to keep memory flat.
+    """
+    ffmpeg_cmd = [
+        'ffmpeg', '-y',
+        '-f', 'rawvideo',
+        '-pixel_format', 'bgr24',
+        '-video_size', f'{frame_width}x{frame_height}',
+        '-framerate', str(fps),
+        '-i', 'pipe:0',
+        '-c:v', 'libx264',
+        '-preset', 'fast',
+        '-crf', '23',
+        '-pix_fmt', 'yuv420p',  # required for broad player compatibility
+        output_path
+    ]
 
-            video_capture = cv2.VideoCapture(video)
-            
-            # =========================================================================================
-            # CHANGE 4: The output video will always be an MP4 for compatibility with the 'avc1' codec.
-            # =========================================================================================
-            out_vid_path = osj(anonymized_videos_path, vid_name + '.mp4')
-            # =========================================================================================
-            
-            frame_width = int(video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-            frame_height = int(video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            frame_size = (frame_width, frame_height)
-            
-            fps = round(video_capture.get(cv2.CAP_PROP_FPS))
-            # 'avc1' is a good choice for H.264 codec in an .mp4 container.
-            output_video = cv2.VideoWriter(out_vid_path, cv2.VideoWriter_fourcc(*'avc1'), fps, frame_size)
-            count = 1
+    proc = subprocess.Popen(
+        ffmpeg_cmd,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        bufsize=0,
+    )
+
+    cap = cv2.VideoCapture(input_path)
+    frame_idx = 1
+    try:
+        with Progress(
+            TextColumn("  Encoding "),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task("", total=total_frames)
             while True:
-                ret, frame = video_capture.read()
-                
+                ret, frame = cap.read()
                 if not ret:
                     break
-                
-                if str(count) in data:
-                    frame = blur_regions(frame, data[str(count)])
 
-                output_video.write(frame)
-                count+=1
-            video_capture.release()
-            output_video.release()
-        print(f"Processed Video {vid_name}")
-    else:
-        console.print(f"No objects detected in file {video}, copying file as is.", style="bold orange")
-        shutil.copy(video, anonymized_videos_path)
-        console.print(f"Copied Video {vid_name}", style="bold green")
-        
-#remove runs folder
-if os.path.exists("runs/"):
-    console.print(f"Removing Temporary Files...")
-    shutil.rmtree("runs/")
-if os.path.exists("annot_jsons/"):
-    shutil.rmtree("annot_jsons/")
+                if detections_dir and os.path.exists(detections_dir):
+                    dets = load_frame_detections(frame_idx, detections_dir, frame_width, frame_height)
+                    if dets:
+                        frame = blur_regions(frame, dets)
 
-console.print(f"Blurred Videos are stored in {anonymized_videos_path}", style="bold yellow")
+                proc.stdin.write(frame.tobytes())
+                del frame
+                progress.advance(task)
+
+                if frame_idx % 100 == 0:
+                    gc.collect()
+
+                frame_idx += 1
+
+        proc.stdin.close()
+        proc.wait(timeout=600)
+
+        if proc.returncode != 0:
+            raise RuntimeError(f"ffmpeg error: {proc.stderr.read().decode()}")
+
+    except Exception:
+        proc.terminate()
+        if os.path.exists(output_path):
+            os.remove(output_path)
+        raise
+    finally:
+        cap.release()
+        gc.collect()
+
+
+def process_video(video_path, model, anonymized_videos_path):
+    """
+    Full pipeline for a single video:
+      1. YOLO detection  (written to a temp dir)
+      2. Frame-by-frame blur  (detections read on-demand from temp dir)
+      3. H.264 encoding via ffmpeg
+    The temp dir is deleted automatically after each video, keeping memory flat.
+    """
+    vid_name, _ = os.path.splitext(os.path.basename(video_path))
+
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            # ── Get video info up front ───────────────────────────────────
+            cap = cv2.VideoCapture(video_path)
+            w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            fps = round(cap.get(cv2.CAP_PROP_FPS))
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            cap.release()
+
+            # ── Phase 1: detect ───────────────────────────────────────────
+            console.print(f"  [1/2] Detecting  {vid_name}  ({total_frames} frames)", style="cyan")
+            device = 'cuda:0' if config["gpu_avail"] else 'cpu'
+            # stream=True yields one result per frame — keeps YOLO memory flat.
+            # We must iterate the generator so frames are actually processed and
+            # label files are written to disk.
+            with Progress(
+                TextColumn("  Detecting "),
+                BarColumn(),
+                MofNCompleteColumn(),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+                console=console,
+            ) as progress:
+                task = progress.add_task("", total=total_frames)
+                for _ in model(
+                    source=video_path,
+                    save=False,
+                    save_txt=True,
+                    conf=config['detection_conf_thresh'],
+                    imgsz=config.get('imgsz', 1280),
+                    device=device,
+                    project=tmp,
+                    name="det",
+                    verbose=False,
+                    stream=True,
+                ):
+                    progress.advance(task)
+
+            if config["gpu_avail"]:
+                torch.cuda.empty_cache()
+            gc.collect()
+
+            # ── Phase 2: blur + encode ────────────────────────────────────
+            console.print(f"  [2/2] Encoding   {vid_name}", style="cyan")
+            detections_dir = os.path.join(tmp, "det", "labels")
+
+            out_path = osj(anonymized_videos_path, vid_name + '.mp4')
+            stream_to_ffmpeg(video_path, out_path, fps, w, h, detections_dir, total_frames)
+
+        console.print(f"  ✓ Done  {vid_name}", style="bold green")
+
+    except Exception as e:
+        console.print(f"  ✗ Failed {vid_name}: {e}", style="bold red")
+
+
+# =============================================================================
+# Main execution
+# =============================================================================
+
+if not videos:
+    console.print("No videos found. Check 'videos_path' in your config.", style="bold red")
+else:
+    console.print(f"Found {len(videos)} video(s). Processing...", style="bold green")
+    for i, video in enumerate(videos, 1):
+        console.print(f"\nVideo {i}/{len(videos)}: {os.path.basename(video)}", style="bold white")
+        process_video(video, model, anonymized_videos_path)
+
+    del model
+    gc.collect()
+    if config["gpu_avail"]:
+        torch.cuda.empty_cache()
+
+console.print(f"Blurred videos are stored in {anonymized_videos_path}", style="bold yellow")
